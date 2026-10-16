@@ -10,7 +10,9 @@
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
+    "prisma:migrate-reset": "prisma migrate reset",
     "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:set-credentials": "tsx prisma/set-credentials.ts",
     "prisma:cleanup-test": "tsx prisma/cleanup-test-data.ts"
   },
   "prisma": {

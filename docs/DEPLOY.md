@@ -74,10 +74,17 @@ npx prisma migrate deploy   # atau `npx prisma migrate dev` saat development
 npx prisma db seed
 ```
 
+Untuk **mengubah kredensial akun yang sudah ada** (tanpa menghapus akun, riwayat transaksi, atau katalog):
+
+```bash
+# Isi dulu INITIAL_*_PASSWORD di .env, lalu jalankan:
+npm run prisma:set-credentials
+```
+
 Untuk mengembalikan database ke kondisi awal (⚠️ **menghapus semua data transaksi**):
 ```bash
-npx prisma migrate reset   # drop + migrate + seed ulang
-npx tsx prisma/cleanup-test-data.ts   # hanya menghapus data uji, mempertahankan akun & katalog
+npm run prisma:migrate-reset   # drop + migrate + seed ulang
+npm run prisma:cleanup-test    # hanya menghapus data uji, mempertahankan akun & katalog
 ```
 
 ### B. Build & Menjalankan di Mode Produksi
