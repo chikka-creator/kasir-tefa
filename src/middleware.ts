@@ -31,7 +31,6 @@ type UserRole = DecodedSession["role"];
  * seluruh API terbuka untuk publik.
  */
 const API_ACCESS_RULES: { pattern: RegExp; roles: UserRole[] }[] = [
-  // Publik: tidak perlu sesi (sudah di-handle oleh bypass di atas)
   // Autentikasi & sesi — semua role
   { pattern: /^\/api\/auth\/me$/, roles: ["ADMIN", "TEACHER", "AUDIT"] },
   // Audit / kepsek — hanya AUDIT
@@ -45,18 +44,21 @@ const API_ACCESS_RULES: { pattern: RegExp; roles: UserRole[] }[] = [
   { pattern: /^\/api\/shifts\/[^/]+\/audit-close$/, roles: ["AUDIT"] },
   { pattern: /^\/api\/shifts\/[^/]+\/verify$/, roles: ["TEACHER"] },
   { pattern: /^\/api\/shifts\//, roles: ["ADMIN", "TEACHER"] },
+  // Persetujuan void HANYA guru pembimbing — inilah dual control yang menjaga
+  // kasir tidak bisa membatalkan transaksi miliknya sendiri.
+  { pattern: /^\/api\/transactions\/[^/]+\/void-approve$/, roles: ["TEACHER"] },
   // Katalog, stok, transaksi — operasi kasir
   {
     pattern: /^\/api\/(products|stock|transactions)(\/|$)/,
     roles: ["ADMIN", "TEACHER"],
   },
-  // Default deny
+  // Default deny: route tak dikenal atas nama ini akan dijawab 403
   { pattern: /^\/api\//, roles: [] },
 ];
 
-function resolveApiRoles(pathname: string): UserRole[] | null {
+function resolveApiRoles(pathname: string): UserRole[] {
   const rule = API_ACCESS_RULES.find((r) => r.pattern.test(pathname));
-  return rule ? rule.roles : null;
+  return rule ? rule.roles : [];
 }
 
 export async function middleware(request: NextRequest) {
@@ -89,13 +91,6 @@ export async function middleware(request: NextRequest) {
   // 0. Proteksi API Route Handlers (RBAC per endpoint, default deny)
   if (pathname.startsWith("/api/")) {
     const allowedRoles = resolveApiRoles(pathname);
-
-    if (!allowedRoles) {
-      return NextResponse.json(
-        { error: "Endpoint tidak dikenal." },
-        { status: 404 }
-      );
-    }
 
     if (!user) {
       return NextResponse.json(
