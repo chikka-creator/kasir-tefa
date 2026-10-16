@@ -16,15 +16,59 @@ interface DecodedSession {
   role: "AUDIT" | "TEACHER" | "ADMIN";
 }
 
+type UserRole = DecodedSession["role"];
+
+/**
+ * Otorisasi API Route Handlers.
+ *
+ * Peta di bawah adalah SATU-SATUNYA sumber kebenaran RBAC untuk /api/*.
+ * Dicocokkan dari atas ke bawah; aturan pertama yang cocok menang.
+ * Route yang tidak cocok dengan aturan mana pun akan DITOLAK (default deny),
+ * sehingga route baru otomatis terkunci sampai ada yang menambahkannya di sini.
+ *
+ * CATATAN: sebelumnya middleware hanya melindungi halaman (RBAC /kasir, /guru,
+ * /audit). Path /api/:path* ikut di matcher tapi tidak pernah di-branch, sehingga
+ * seluruh API terbuka untuk publik.
+ */
+const API_ACCESS_RULES: { pattern: RegExp; roles: UserRole[] }[] = [
+  // Publik: tidak perlu sesi (sudah di-handle oleh bypass di atas)
+  // Autentikasi & sesi — semua role
+  { pattern: /^\/api\/auth\/me$/, roles: ["ADMIN", "TEACHER", "AUDIT"] },
+  // Audit / kepsek — hanya AUDIT
+  { pattern: /^\/api\/audit\//, roles: ["AUDIT"] },
+  { pattern: /^\/api\/reports\//, roles: ["AUDIT"] },
+  // Supervisor / guru pembimbing — hanya TEACHER
+  { pattern: /^\/api\/supervisor\//, roles: ["TEACHER"] },
+  // Log audit — TEACHER (portal guru) & AUDIT (forensik)
+  { pattern: /^\/api\/audit-logs$/, roles: ["TEACHER", "AUDIT"] },
+  // Shift: aksi verifikasi guru & finalisasi audit dipisah dari operasi kasir
+  { pattern: /^\/api\/shifts\/[^/]+\/audit-close$/, roles: ["AUDIT"] },
+  { pattern: /^\/api\/shifts\/[^/]+\/verify$/, roles: ["TEACHER"] },
+  { pattern: /^\/api\/shifts\//, roles: ["ADMIN", "TEACHER"] },
+  // Katalog, stok, transaksi — operasi kasir
+  {
+    pattern: /^\/api\/(products|stock|transactions)(\/|$)/,
+    roles: ["ADMIN", "TEACHER"],
+  },
+  // Default deny
+  { pattern: /^\/api\//, roles: [] },
+];
+
+function resolveApiRoles(pathname: string): UserRole[] | null {
+  const rule = API_ACCESS_RULES.find((r) => r.pattern.test(pathname));
+  return rule ? rule.roles : null;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Lewati file statis, aset Next.js, dan endpoint auth publik
+  // Lewati file statis, aset Next.js, dan endpoint auth publik.
+  // Perbandingan exact (bukan startsWith) agar /api/auth/loginX tidak ikut terbebas.
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon.ico") ||
-    pathname.startsWith("/api/auth/login") ||
-    pathname.startsWith("/api/auth/logout")
+    pathname === "/api/auth/login" ||
+    pathname === "/api/auth/logout"
   ) {
     return NextResponse.next();
   }
@@ -40,6 +84,34 @@ export async function middleware(request: NextRequest) {
     } catch {
       user = null;
     }
+  }
+
+  // 0. Proteksi API Route Handlers (RBAC per endpoint, default deny)
+  if (pathname.startsWith("/api/")) {
+    const allowedRoles = resolveApiRoles(pathname);
+
+    if (!allowedRoles) {
+      return NextResponse.json(
+        { error: "Endpoint tidak dikenal." },
+        { status: 404 }
+      );
+    }
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Sesi tidak ditemukan. Silakan login kembali." },
+        { status: 401 }
+      );
+    }
+
+    if (!allowedRoles.includes(user.role)) {
+      return NextResponse.json(
+        { error: "Anda tidak memiliki akses ke endpoint ini." },
+        { status: 403 }
+      );
+    }
+
+    return NextResponse.next();
   }
 
   // 1. Halaman Login

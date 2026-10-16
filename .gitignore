@@ -39,3 +39,5 @@ Thumbs.db
 # Prisma local artifacts
 prisma/*.db
 prisma/*.db-journal
+.vercel
+.env*

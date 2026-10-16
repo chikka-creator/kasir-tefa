@@ -49,18 +49,25 @@ export default function LaporanPrintPage() {
 
     async function loadData() {
       try {
-        const [resAnalytics, resShifts] = await Promise.all([
-          fetch("/api/audit/analytics"),
-          fetch("/api/shifts"),
-        ]);
+        // Catatan: sebelumnya halaman ini memanggil GET /api/shifts yang tidak pernah
+        // ada, sehingga Section II selalu kosong. Data shift sudah disediakan oleh
+        // /api/audit/analytics (verified_shifts + audited_shifts).
+        const resAnalytics = await fetch("/api/audit/analytics");
 
         if (resAnalytics.ok) {
           const dataA = await resAnalytics.json();
           setAnalytics(dataA);
-        }
-        if (resShifts.ok) {
-          const dataS = await resShifts.json();
-          setShifts(dataS);
+
+          const merged: ShiftRecord[] = [
+            ...(dataA.verified_shifts || []),
+            ...(dataA.audited_shifts || []),
+          ].sort((a, b) => {
+            const ta = a.closed_at ? new Date(a.closed_at).getTime() : 0;
+            const tb = b.closed_at ? new Date(b.closed_at).getTime() : 0;
+            return tb - ta;
+          });
+
+          setShifts(merged);
         }
       } catch (err) {
         console.error("Failed to load print report data", err);
