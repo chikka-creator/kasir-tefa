@@ -47,6 +47,8 @@ export default function LoginPage() {
     setError(null);
   };
 
+  const showDemoAccounts = process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === "true";
+
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4 sm:p-6">
       <div className="w-full max-w-md">
@@ -128,43 +130,49 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Quick Demo Switcher */}
-          <div className="mt-6 pt-5 border-t border-subtle">
-            <div className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider mb-2.5">
-              Pilihan Akun Demo Cepat (1-Klik):
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setDemoCredentials("kasir_tefa", "kasir123")}
-                className="flex flex-col items-center justify-center p-2 rounded-lg border border-subtle bg-neutral-50 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-900 transition-colors text-center group"
-              >
-                <UserCheck className="w-4 h-4 text-emerald-600 mb-1 group-hover:scale-110 transition-transform" />
-                <span className="text-[11px] font-bold text-ink">Kasir Siswa</span>
-                <span className="text-[9px] text-ink-muted">Shared POS</span>
-              </button>
+          {/* Quick Demo Switcher
+              Hanya untuk demo/presentasi lokal. Di production (dan Vercel) flag ini
+              TIDAK di-set, sehingga panel ini tidak pernah dirender: membocorkan ketiga
+              username ke siapa pun yang membuka halaman login, dan passwordnya pun tidak
+              lagi sama dengan kredensial hasil seed yang di-randomize. */}
+          {showDemoAccounts && (
+            <div className="mt-6 pt-5 border-t border-subtle">
+              <div className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider mb-2.5">
+                Pilihan Akun Demo Cepat (1-Klik):
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDemoCredentials("kasir_tefa", "kasir123")}
+                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-subtle bg-neutral-50 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-900 transition-colors text-center group"
+                >
+                  <UserCheck className="w-4 h-4 text-emerald-600 mb-1 group-hover:scale-110 transition-transform" />
+                  <span className="text-[11px] font-bold text-ink">Kasir Siswa</span>
+                  <span className="text-[9px] text-ink-muted">Shared POS</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setDemoCredentials("guru_tefa", "guru123")}
-                className="flex flex-col items-center justify-center p-2 rounded-lg border border-subtle bg-neutral-50 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-900 transition-colors text-center group"
-              >
-                <GraduationCap className="w-4 h-4 text-amber-600 mb-1 group-hover:scale-110 transition-transform" />
-                <span className="text-[11px] font-bold text-ink">Guru TeFa</span>
-                <span className="text-[9px] text-ink-muted">PIN 123456</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setDemoCredentials("guru_tefa", "guru123")}
+                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-subtle bg-neutral-50 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-900 transition-colors text-center group"
+                >
+                  <GraduationCap className="w-4 h-4 text-amber-600 mb-1 group-hover:scale-110 transition-transform" />
+                  <span className="text-[11px] font-bold text-ink">Guru TeFa</span>
+                  <span className="text-[9px] text-ink-muted">PIN 123456</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setDemoCredentials("audit_sekolah", "audit123")}
-                className="flex flex-col items-center justify-center p-2 rounded-lg border border-subtle bg-neutral-50 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-900 transition-colors text-center group"
-              >
-                <Shield className="w-4 h-4 text-blue-600 mb-1 group-hover:scale-110 transition-transform" />
-                <span className="text-[11px] font-bold text-ink">Tim Audit</span>
-                <span className="text-[9px] text-ink-muted">Kepala/Owner</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setDemoCredentials("audit_sekolah", "audit123")}
+                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-subtle bg-neutral-50 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-900 transition-colors text-center group"
+                >
+                  <Shield className="w-4 h-4 text-blue-600 mb-1 group-hover:scale-110 transition-transform" />
+                  <span className="text-[11px] font-bold text-ink">Tim Audit</span>
+                  <span className="text-[9px] text-ink-muted">Kepala/Owner</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer Note */}
