@@ -1,5 +1,28 @@
 import { prisma } from "@/lib/db";
 
+let cachedSystemUserId: string | null = null;
+
+/**
+ * `stock_movements.created_by` adalah foreign key ke users, jadi tidak boleh
+ * memakai UUID palsu. Fallback ini mencari akun ADMIN aktif pertama.
+ */
+async function resolveSystemUserId(): Promise<string> {
+  if (cachedSystemUserId) return cachedSystemUserId;
+
+  const admin = await prisma.user.findFirst({
+    where: { role: "ADMIN", is_active: true },
+    orderBy: { created_at: "asc" },
+    select: { id: true },
+  });
+
+  if (!admin) {
+    throw new Error("Tidak ada akun ADMIN aktif untuk mencatat pergerakan stok.");
+  }
+
+  cachedSystemUserId = admin.id;
+  return admin.id;
+}
+
 export interface ShiftRecord {
   id: string;
   shift_code: string;
@@ -329,6 +352,10 @@ export async function createNewTransaction(data: {
   cash_received?: number;
   cash_change?: number;
   qris_reference?: string;
+  userContext?: {
+    user_id?: string;
+    user_role?: string;
+  };
 }) {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const randomInv = Math.floor(Math.random() * 9000 + 1000);
@@ -339,32 +366,72 @@ export async function createNewTransaction(data: {
   const totalCost = data.items.reduce((sum, item) => sum + item.cost_price_snapshot * item.qty, 0);
 
   try {
-    const created = await prisma.transaction.create({
-      data: {
-        invoice_number: invoiceNumber,
-        shift_id: data.shift_id,
-        device_terminal: data.device_terminal,
-        subtotal,
-        total_amount: totalAmount,
-        total_cost: totalCost,
-        payment_method: data.payment_method,
-        cash_received: data.cash_received ?? null,
-        cash_change: data.cash_change ?? null,
-        qris_reference: data.qris_reference || (data.payment_method === "QRIS" ? "QRIS-STATIS-VERIFIED" : null),
-        status: "PAID",
-        items: {
-          create: data.items.map((item) => ({
-            product_id: item.product_id,
-            product_name_snapshot: item.product_name_snapshot,
-            item_type_snapshot: item.item_type_snapshot,
-            qty: item.qty,
-            cost_price_snapshot: item.cost_price_snapshot,
-            selling_price_snapshot: item.selling_price_snapshot,
-            subtotal: item.subtotal,
-          })),
+    const createdBy = data.userContext?.user_id || (await resolveSystemUserId());
+
+    const created = await prisma.$transaction(async (tx) => {
+      const transaction = await tx.transaction.create({
+        data: {
+          invoice_number: invoiceNumber,
+          shift_id: data.shift_id,
+          device_terminal: data.device_terminal,
+          subtotal,
+          total_amount: totalAmount,
+          total_cost: totalCost,
+          payment_method: data.payment_method,
+          cash_received: data.cash_received ?? null,
+          cash_change: data.cash_change ?? null,
+          qris_reference: data.qris_reference || (data.payment_method === "QRIS" ? "QRIS-STATIS-VERIFIED" : null),
+          status: "PAID",
+          items: {
+            create: data.items.map((item) => ({
+              product_id: item.product_id,
+              product_name_snapshot: item.product_name_snapshot,
+              item_type_snapshot: item.item_type_snapshot,
+              qty: item.qty,
+              cost_price_snapshot: item.cost_price_snapshot,
+              selling_price_snapshot: item.selling_price_snapshot,
+              subtotal: item.subtotal,
+            })),
+          },
         },
-      },
-      include: { items: true },
+        include: { items: true },
+      });
+
+      // Penjualan barang fisik harus mengurangi stok. Tanpa ini, pembatalan
+      // transaksi (returnStockForVoidedItems) akan menambah stok fiktif.
+      for (const item of data.items) {
+        if (item.item_type_snapshot !== "GOODS" || item.qty <= 0) continue;
+
+        const product = await tx.product.findUnique({
+          where: { id: item.product_id },
+          select: { stock_qty: true, name: true },
+        });
+        if (!product || product.stock_qty === null) continue;
+
+        const stockBefore = product.stock_qty;
+        const stockAfter = stockBefore - item.qty;
+
+        await tx.product.update({
+          where: { id: item.product_id },
+          data: { stock_qty: stockAfter },
+        });
+
+        await tx.stockMovement.create({
+          data: {
+            product_id: item.product_id,
+            shift_id: data.shift_id,
+            movement_type: "SALE",
+            qty_change: -item.qty,
+            stock_before: stockBefore,
+            stock_after: stockAfter,
+            reason_category: "POS_SALE",
+            notes: `Penualan transaksi #${invoiceNumber} - ${item.qty} x ${item.product_name_snapshot}`,
+            created_by: createdBy,
+          },
+        });
+      }
+
+      return transaction;
     });
 
     return {

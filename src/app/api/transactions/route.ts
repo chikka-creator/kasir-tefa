@@ -5,6 +5,7 @@ import {
   getAllRecentTransactions,
   getActiveShiftWithSummary,
 } from "@/lib/shifts-data";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const user = await getCurrentUser();
     const body = await request.json();
     const {
       shift_id,
@@ -90,6 +92,10 @@ export async function POST(request: Request) {
       cash_change: payment_method === "CASH" ? Number(cash_change || 0) : undefined,
       // Sesuai arahan: QRIS langsung diselesaikan oleh admin tanpa perlu input no referensi pelanggan
       qris_reference: payment_method === "QRIS" ? (qris_reference || "QRIS-STATIS-VERIFIED") : undefined,
+      userContext: {
+        user_id: user?.id,
+        user_role: user?.role,
+      },
     });
 
     return NextResponse.json({
