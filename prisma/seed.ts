@@ -1,56 +1,100 @@
 import { PrismaClient, Role, ItemType, MovementType } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 
 const prisma = new PrismaClient();
+
+/**
+ * Kredensial awal diambil dari environment variable agar tidak ada password
+ * hardcoded di source code. Jika env var tidak diisi, generate acak dan hanya
+ * dicetak ke console saat akun benar-benar baru dibuat.
+ */
+const envOrRandom = (value: string | undefined, bytes = 9): string =>
+  value && value.trim().length > 0 ? value : randomBytes(bytes).toString("base64url");
+
+const envPinOrRandom = (value: string | undefined): string => {
+  const pin = value?.trim();
+  return pin && /^\d{4,8}$/.test(pin) ? pin : String(Math.floor(100000 + Math.random() * 900000));
+};
 
 async function main() {
   console.log("🌱 Starting TeFa Percetakan Database Seeding...");
 
   // 1. Akun Pengguna Awal
   const saltRounds = 10;
-  const auditPasswordHash = await bcrypt.hash("audit123", saltRounds);
-  const teacherPasswordHash = await bcrypt.hash("guru123", saltRounds);
-  const teacherPinHash = await bcrypt.hash("123456", saltRounds);
-  const adminPasswordHash = await bcrypt.hash("kasir123", saltRounds);
+
+  const auditPassword = envOrRandom(process.env.INITIAL_AUDIT_PASSWORD);
+  const teacherPassword = envOrRandom(process.env.INITIAL_TEACHER_PASSWORD);
+  const adminPassword = envOrRandom(process.env.INITIAL_ADMIN_PASSWORD);
+  const teacherPin = envPinOrRandom(process.env.INITIAL_TEACHER_PIN);
+
+  const generatedCredentials: string[] = [];
+
+  const auditUsername = process.env.INITIAL_AUDIT_USERNAME || "audit_sekolah";
+  const teacherUsername = process.env.INITIAL_TEACHER_USERNAME || "guru_tefa";
+  const adminUsername = process.env.INITIAL_ADMIN_USERNAME || "kasir_tefa";
+
+  const existed = {
+    audit: !!(await prisma.user.findUnique({ where: { username: auditUsername } })),
+    teacher: !!(await prisma.user.findUnique({ where: { username: teacherUsername } })),
+    admin: !!(await prisma.user.findUnique({ where: { username: adminUsername } })),
+  };
 
   const auditUser = await prisma.user.upsert({
-    where: { username: "audit_sekolah" },
+    where: { username: auditUsername },
     update: {},
     create: {
-      username: "audit_sekolah",
+      username: auditUsername,
       full_name: "Kepala Unit & Tim Audit",
-      password_hash: auditPasswordHash,
+      password_hash: await bcrypt.hash(auditPassword, saltRounds),
       role: Role.AUDIT,
       is_active: true,
     },
   });
 
+  if (!existed.audit) {
+    generatedCredentials.push(`  AUDIT   (${auditUser.username})  password: ${auditPassword}`);
+  }
+
   const teacherUser = await prisma.user.upsert({
-    where: { username: "guru_tefa" },
-    update: { supervisor_pin_hash: teacherPinHash },
+    where: { username: teacherUsername },
+    update: {},
     create: {
-      username: "guru_tefa",
+      username: teacherUsername,
       full_name: "Pak Pembimbing TeFa",
-      password_hash: teacherPasswordHash,
+      password_hash: await bcrypt.hash(teacherPassword, saltRounds),
       role: Role.TEACHER,
-      supervisor_pin_hash: teacherPinHash,
+      supervisor_pin_hash: await bcrypt.hash(teacherPin, saltRounds),
       is_active: true,
     },
   });
 
+  if (!existed.teacher) {
+    generatedCredentials.push(`  TEACHER (${teacherUser.username})  password: ${teacherPassword}  PIN: ${teacherPin}`);
+  }
+
   const adminUser = await prisma.user.upsert({
-    where: { username: "kasir_tefa" },
+    where: { username: adminUsername },
     update: {},
     create: {
-      username: "kasir_tefa",
+      username: adminUsername,
       full_name: "Admin Kasir Siswa (Shared POS 1 & 2)",
-      password_hash: adminPasswordHash,
+      password_hash: await bcrypt.hash(adminPassword, saltRounds),
       role: Role.ADMIN,
       is_active: true,
     },
   });
 
-  console.log("✅ Seeded 3 Core Users (AUDIT, TEACHER with PIN 123456, ADMIN)");
+  if (!existed.admin) {
+    generatedCredentials.push(`  ADMIN   (${adminUser.username})  password: ${adminPassword}`);
+  }
+
+  console.log("✅ Seeded 3 Core Users (AUDIT, TEACHER with PIN, ADMIN)");
+  if (generatedCredentials.length > 0) {
+    console.log("\n🔐 Kredensial akun yang baru dibuat — CATAT SEKARANG, tidak akan ditampilkan lagi:");
+    generatedCredentials.forEach((line) => console.log(line));
+    console.log("");
+  }
 
   // 2. Kategori Percetakan
   const categoriesData = [

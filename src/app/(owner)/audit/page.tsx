@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Shield,
@@ -35,8 +35,13 @@ export default function AuditPage() {
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const fetchAllData = useCallback(async () => {
-    setIsLoading(true);
+  const busyRef = useRef(false);
+
+  const fetchAllData = useCallback(async (silent = false) => {
+    // Guard hanya untuk polling: refresh manual dari user tidak boleh pernah ter-skip
+    if (silent && busyRef.current) return;
+    busyRef.current = true;
+    if (!silent) setIsLoading(true);
     try {
       const [resAnalytics, resLogs, resUsers] = await Promise.all([
         fetch("/api/audit/analytics"),
@@ -62,17 +67,26 @@ export default function AuditPage() {
       }
     } catch (err: unknown) {
       console.error("Failed to load audit page data", err);
-      setStatusMsg({
-        type: "error",
-        text: "Gagal memuat sebagian data audit.",
-      });
+      if (!silent) {
+        setStatusMsg({
+          type: "error",
+          text: "Gagal memuat sebagian data audit.",
+        });
+      }
     } finally {
-      setIsLoading(false);
+      busyRef.current = false;
+      if (!silent) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     fetchAllData();
+    // Polling 15 detik agar angka financial & shift terbaru muncul tanpa refresh manual
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchAllData(true);
+    }, 15000);
+
+    return () => clearInterval(interval);
   }, [fetchAllData]);
 
   // Handler for Excel Export (.xlsx)
@@ -132,7 +146,7 @@ export default function AuditPage() {
         {/* Quick Export & Refresh Actions */}
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={fetchAllData}
+            onClick={() => fetchAllData()}
             disabled={isLoading}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-subtle bg-white hover:bg-neutral-50 text-ink text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
             title="Refresh Seluruh Data"

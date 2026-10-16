@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   GraduationCap,
   KeyRound,
@@ -43,9 +43,14 @@ export default function GuruPage() {
   // Modal states
   const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
 
-  const fetchDashboardData = async () => {
+  const busyRef = useRef(false);
+
+  const fetchDashboardData = async (silent = false) => {
+    // Guard hanya untuk polling: refresh manual dari user tidak boleh pernah ter-skip
+    if (silent && busyRef.current) return;
+    busyRef.current = true;
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
 
       // Fetch alerts & voids
       const alertsRes = await fetch("/api/supervisor/alerts");
@@ -62,14 +67,23 @@ export default function GuruPage() {
       const auditData = await auditRes.json();
       setAuditLogs(auditData.audit_logs || []);
     } catch (err) {
-      console.error("fetchDashboardData error:", err);
+      if (!silent) {
+        console.error("fetchDashboardData error:", err);
+      }
     } finally {
-      setIsLoading(false);
+      busyRef.current = false;
+      if (!silent) setIsLoading(false);
     }
   };
 
   useEffect(() => {
     fetchDashboardData();
+    // Polling 15 detik agar request void & shift pending dari kasir muncul tanpa refresh manual
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchDashboardData(true);
+    }, 15000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const filteredLogs = auditLogs.filter((log) => {
@@ -118,7 +132,7 @@ export default function GuruPage() {
 
           {/* Refresh */}
           <button
-            onClick={fetchDashboardData}
+            onClick={() => fetchDashboardData()}
             disabled={isLoading}
             className="p-2 rounded-lg border border-subtle bg-white hover:bg-neutral-100 text-ink-muted hover:text-ink transition-colors shadow-2xs"
             title="Muat ulang data dashboard"
