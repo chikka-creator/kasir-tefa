@@ -18,9 +18,20 @@ export async function POST(
       );
     }
 
+    let actualQrisNum: number | undefined;
+    if (actual_qris_counted !== undefined && actual_qris_counted !== null) {
+      actualQrisNum = Number(actual_qris_counted);
+      if (isNaN(actualQrisNum) || actualQrisNum < 0) {
+        return NextResponse.json(
+          { error: "Total QRIS yang masuk rekening harus berupa angka valid." },
+          { status: 400 }
+        );
+      }
+    }
+
     const closedShift = await closeActiveShift(shiftId, {
       actual_cash_counted: actualCashNum,
-      actual_qris_counted: actual_qris_counted !== undefined ? Number(actual_qris_counted) : undefined,
+      actual_qris_counted: actualQrisNum,
       closing_notes: closing_notes ? String(closing_notes).trim() : undefined,
     });
 

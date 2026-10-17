@@ -54,6 +54,10 @@ export function VerifyShiftModal({
   const variance = shift.cash_variance || actualCash - expectedCash;
   const varianceStatus = shift.variance_status || (variance === 0 ? "BALANCE" : variance < 0 ? "MINUS" : "PLUS");
 
+  const expectedQris = shift.expected_qris ?? qrisSales;
+  const actualQris = shift.actual_qris_counted ?? expectedQris;
+  const qrisVariance = actualQris - expectedQris;
+
   const getGradeInfo = (val: number) => {
     if (val >= 90) return { label: "Sangat Baik (A)", color: "text-emerald-700 bg-emerald-100 border-emerald-300" };
     if (val >= 80) return { label: "Baik (B)", color: "text-blue-700 bg-blue-100 border-blue-300" };
@@ -227,6 +231,33 @@ export function VerifyShiftModal({
                   Rp {qrisSales.toLocaleString("id-ID")}
                 </span>
               </div>
+
+              {expectedQris > 0 && (
+                <>
+                  <div className="p-2.5 rounded-lg bg-neutral-50 border border-subtle">
+                    <span className="text-ink-muted text-[10px] block flex items-center gap-1">
+                      <CreditCard className="w-3 h-3 text-blue-600" />
+                      QRIS Riil di Rekening:
+                    </span>
+                    <span className="font-mono font-bold text-blue-700">
+                      Rp {actualQris.toLocaleString("id-ID")}
+                    </span>
+                  </div>
+
+                  <div className={`p-2.5 rounded-lg border ${
+                    qrisVariance === 0
+                      ? "bg-emerald-50/60 border-emerald-200"
+                      : "bg-rose-50/60 border-rose-200"
+                  }`}>
+                    <span className="text-ink-muted text-[10px] block">Selisih QRIS:</span>
+                    <span className={`font-mono font-bold ${
+                      qrisVariance === 0 ? "text-emerald-700" : "text-rose-700"
+                    }`}>
+                      Rp {qrisVariance.toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                </>
+              )}
 
               <div className="p-2.5 rounded-lg bg-neutral-50 border border-subtle">
                 <span className="text-ink-muted text-[10px] block">Target Kas Sistem:</span>

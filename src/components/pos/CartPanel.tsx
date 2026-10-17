@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   RefreshCw,
 } from "lucide-react";
+import Image from "next/image";
 import { usePosCartStore, CartItem } from "@/store/usePosCartStore";
 import { usePosTerminalStore } from "@/store/usePosTerminalStore";
 import { useShiftStore } from "@/store/useShiftStore";
@@ -436,35 +437,16 @@ export function CartPanel({ onTransactionSuccess, onBackToCatalog }: CartPanelPr
           {paymentMethod === "QRIS" && (
             <div className="p-3 rounded-lg border border-subtle bg-white text-center space-y-2">
               <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-neutral-50 border border-dashed border-neutral-300">
-                {/* Visual SVG QR Code Standar Indonesia */}
+                {/* Gambar QRIS Statis Asli (public/qris-tefa-percetakan.png) */}
                 <div className="bg-white p-2 rounded-md border border-subtle shadow-xs mb-1">
-                  <svg className="w-28 h-28 mx-auto" viewBox="0 0 100 100" fill="none">
-                    <rect width="100" height="100" fill="white" />
-                    {/* Corner 1 */}
-                    <rect x="10" y="10" width="24" height="24" fill="#18181B" />
-                    <rect x="14" y="14" width="16" height="16" fill="white" />
-                    <rect x="18" y="18" width="8" height="8" fill="#18181B" />
-                    {/* Corner 2 */}
-                    <rect x="66" y="10" width="24" height="24" fill="#18181B" />
-                    <rect x="70" y="14" width="16" height="16" fill="white" />
-                    <rect x="74" y="18" width="8" height="8" fill="#18181B" />
-                    {/* Corner 3 */}
-                    <rect x="10" y="66" width="24" height="24" fill="#18181B" />
-                    <rect x="14" y="70" width="16" height="16" fill="white" />
-                    <rect x="18" y="74" width="8" height="8" fill="#18181B" />
-                    {/* Pattern Dots */}
-                    <rect x="42" y="14" width="6" height="6" fill="#18181B" />
-                    <rect x="52" y="14" width="6" height="6" fill="#18181B" />
-                    <rect x="42" y="24" width="6" height="6" fill="#18181B" />
-                    <rect x="38" y="38" width="24" height="24" fill="#18181B" />
-                    <rect x="44" y="44" width="12" height="12" fill="white" />
-                    <rect x="48" y="48" width="4" height="4" fill="#18181B" />
-                    <rect x="68" y="44" width="6" height="6" fill="#18181B" />
-                    <rect x="78" y="54" width="6" height="6" fill="#18181B" />
-                    <rect x="42" y="72" width="6" height="6" fill="#18181B" />
-                    <rect x="54" y="78" width="6" height="6" fill="#18181B" />
-                    <rect x="68" y="70" width="8" height="8" fill="#18181B" />
-                  </svg>
+                  <Image
+                    src="/qris-tefa-percetakan.png"
+                    alt="QRIS Statis TEFA Percetakan"
+                    width={112}
+                    height={112}
+                    className="mx-auto h-28 w-28 object-contain"
+                    priority
+                  />
                 </div>
                 <div className="text-[10px] font-bold text-ink">QRIS STATIS TEFA PERCETAKAN</div>
                 <div className="text-[9px] text-ink-muted">NMID: ID1020261015001</div>

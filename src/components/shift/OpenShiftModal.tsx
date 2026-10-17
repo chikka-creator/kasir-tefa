@@ -180,10 +180,12 @@ export function OpenShiftModal({ isOpen, onClose }: OpenShiftModalProps) {
               <input
                 type="number"
                 min="0"
-                step="1000"
+                step="any"
                 required
                 value={openingCash}
-                onChange={(e) => setOpeningCash(Number(e.target.value))}
+                onChange={(e) =>
+                  setOpeningCash(e.target.value === "" ? 0 : Number(e.target.value))
+                }
                 placeholder="100000"
                 className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold text-ink rounded-lg border border-subtle bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 tabular-nums"
               />

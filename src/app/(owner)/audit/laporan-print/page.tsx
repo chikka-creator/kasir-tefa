@@ -200,7 +200,7 @@ export default function LaporanPrintPage() {
                 </span>
               </div>
               <div className="flex justify-between py-0.5">
-                <span>Non-Tunai (QRIS Dinamis):</span>
+                <span>Non-Tunai (QRIS Statis):</span>
                 <span className="font-mono font-medium">
                   {formatRupiah(payment?.qris.amount || 0)} ({payment?.qris.count || 0} tx)
                 </span>

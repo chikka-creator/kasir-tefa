@@ -1,7 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Lock, AlertTriangle, CheckCircle, Scale, DollarSign, AlertCircle } from "lucide-react";
+import {
+  X,
+  Lock,
+  AlertTriangle,
+  CheckCircle,
+  Scale,
+  DollarSign,
+  AlertCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { useShiftStore } from "@/store/useShiftStore";
 
 interface CloseShiftModalProps {
@@ -22,31 +31,61 @@ export function CloseShiftModal({ isOpen, onClose }: CloseShiftModalProps) {
   const expectedCash = summary?.current_cash_in_drawer ?? 0;
   const cashVariance = actualCash - expectedCash;
 
-  let varianceBadge = {
-    label: "BALANCE (Pas)",
-    bg: "bg-emerald-50 text-emerald-800 border-emerald-200",
-    icon: CheckCircle,
+  const expectedQris = summary?.total_qris_sales ?? 0;
+  const hasQrisSales = expectedQris > 0;
+  const qrisVariance = actualQris - expectedQris;
+
+  const buildVarianceBadge = (
+    variance: number
+  ): { label: string; bg: string; icon: LucideIcon } => {
+    if (variance < 0) {
+      return {
+        label: `MINUS (Kurang Rp ${Math.abs(variance).toLocaleString("id-ID")})`,
+        bg: "bg-red-50 text-red-800 border-red-200",
+        icon: AlertTriangle,
+      };
+    }
+    if (variance > 0) {
+      return {
+        label: `PLUS (Lebih Rp ${variance.toLocaleString("id-ID")})`,
+        bg: "bg-amber-50 text-amber-800 border-amber-200",
+        icon: AlertTriangle,
+      };
+    }
+    return {
+      label: "BALANCE (Pas)",
+      bg: "bg-emerald-50 text-emerald-800 border-emerald-200",
+      icon: CheckCircle,
+    };
   };
 
-  if (cashVariance < 0) {
-    varianceBadge = {
-      label: `MINUS (Kurang Rp ${Math.abs(cashVariance).toLocaleString("id-ID")})`,
-      bg: "bg-red-50 text-red-800 border-red-200",
-      icon: AlertTriangle,
-    };
-  } else if (cashVariance > 0) {
-    varianceBadge = {
-      label: `PLUS (Lebih Rp ${cashVariance.toLocaleString("id-ID")})`,
-      bg: "bg-amber-50 text-amber-800 border-amber-200",
-      icon: AlertTriangle,
-    };
-  }
+  const varianceBadge = buildVarianceBadge(cashVariance);
+  const qrisVarianceBadge = buildVarianceBadge(hasQrisSales ? qrisVariance : 0);
+  const hasVariance = cashVariance !== 0 || (hasQrisSales && qrisVariance !== 0);
 
   const VarianceIcon = varianceBadge.icon;
+  const QrisVarianceIcon = qrisVarianceBadge.icon;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (Number.isNaN(actualCash) || actualCash < 0) {
+      setError("Hitungan uang tunai fisik di laci harus berupa angka valid dan tidak boleh negatif.");
+      return;
+    }
+
+    if (hasQrisSales && (Number.isNaN(actualQris) || actualQris < 0)) {
+      setError("Total QRIS yang masuk rekening harus berupa angka valid dan tidak boleh negatif.");
+      return;
+    }
+
+    if (hasVariance && closingNotes.trim() === "") {
+      setError(
+        "Catatan Penutupan Shift wajib diisi bila terjadi selisih kas atau selisih QRIS."
+      );
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -55,7 +94,7 @@ export function CloseShiftModal({ isOpen, onClose }: CloseShiftModalProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           actual_cash_counted: actualCash,
-          actual_qris_counted: actualQris,
+          actual_qris_counted: hasQrisSales ? actualQris : undefined,
           closing_notes: closingNotes,
         }),
       });
@@ -99,7 +138,11 @@ export function CloseShiftModal({ isOpen, onClose }: CloseShiftModalProps) {
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto">
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="p-4 sm:p-5 space-y-4 overflow-y-auto"
+        >
           {error && (
             <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
@@ -154,10 +197,12 @@ export function CloseShiftModal({ isOpen, onClose }: CloseShiftModalProps) {
                 <input
                   type="number"
                   min="0"
-                  step="500"
+                  step="any"
                   required
                   value={actualCash}
-                  onChange={(e) => setActualCash(Number(e.target.value))}
+                  onChange={(e) =>
+                    setActualCash(e.target.value === "" ? 0 : Number(e.target.value))
+                  }
                   className="w-full pl-9 pr-3 py-2 text-sm font-mono font-bold text-ink rounded-lg border border-subtle bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 tabular-nums"
                 />
               </div>
@@ -174,10 +219,46 @@ export function CloseShiftModal({ isOpen, onClose }: CloseShiftModalProps) {
               </span>
             </div>
 
+            {/* Input QRIS Riil (Hanya Bila Ada Transaksi QRIS) */}
+            {hasQrisSales && (
+              <div>
+                <label className="block text-xs font-semibold text-ink mb-1">
+                  Total QRIS yang Benar-benar Masuk Rekening (Dicek Pengawas):
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-ink-muted">
+                    Rp
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    required
+                    value={actualQris}
+                    onChange={(e) =>
+                      setActualQris(e.target.value === "" ? 0 : Number(e.target.value))
+                    }
+                    className="w-full pl-9 pr-3 py-2 text-sm font-mono font-bold text-ink rounded-lg border border-subtle bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 tabular-nums"
+                  />
+                </div>
+                <div
+                  className={`flex items-center justify-between p-3 rounded-lg border mt-3 ${qrisVarianceBadge.bg}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <QrisVarianceIcon className="w-4 h-4 shrink-0" />
+                    <span className="text-xs font-bold">Status Selisih QRIS:</span>
+                  </div>
+                  <span className="text-xs font-mono font-bold tabular-nums">
+                    {qrisVarianceBadge.label}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Catatan / Berita Acara */}
             <div>
               <label className="block text-xs font-semibold text-ink mb-1">
-                Catatan Penutupan Shift {cashVariance !== 0 && <span className="text-red-600 font-bold">(Wajib Diisi Bila Terjadi Selisih)</span>}:
+                Catatan Penutupan Shift {hasVariance && <span className="text-red-600 font-bold">(Wajib Diisi Bila Terjadi Selisih)</span>}:
               </label>
               <textarea
                 rows={2}
